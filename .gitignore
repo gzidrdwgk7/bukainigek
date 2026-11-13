@@ -1,0 +1,4 @@
+   node_modules/
+   gebetan.db
+   gebetan.db-*
+   .env
