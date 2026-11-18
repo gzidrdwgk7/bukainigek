@@ -72,7 +72,6 @@
   button:focus-visible, .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
   .hint { font-size: .85rem; min-height: 1.3em; margin: 6px 0 0; }
 
-
   .love { font-family: "Caveat", "Comic Sans MS", cursive; font-size: 5rem; line-height: 1; color: var(--rose); margin: -6px 0 18px; }
   .love span { font-size: 2.4rem; }
 
@@ -92,17 +91,10 @@
     object-fit: contain;
     border-radius: 10px;
   }
-  .hadiah-kosong {
-    display: none;
-    padding: 36px 12px;
-    color: var(--muted);
-    font-size: .9rem;
-  }
-  .hadiah-frame.error img { display: none; }
-  .hadiah-frame.error .hadiah-kosong { display: block; }
   .hadiah figcaption { margin-top: 14px; font-size: .95rem; line-height: 1.5; color: var(--ink); }
 
   .verdict { font-size: .88rem; margin-bottom: 20px; }
+  .verdict:empty { display: none; }
   #form-error { color: var(--rose-dark); margin: 4px 0 14px; }
   label { display: block; text-align: left; font-weight: 700; margin: 16px 0 6px; }
   label b { color: var(--rose); float: right; }
@@ -125,7 +117,7 @@
 <body>
 <main class="card">
 
-  <!-- Layar 1: amplop -->
+  <!-- Layar 1: pembuka -->
   <section class="screen active" id="s1">
     <span class="emoji">💌</span>
     <h1>Hai, <span class="nama"></span>.</h1>
@@ -150,8 +142,8 @@
     <h1>Yeyyy!</h1>
     <p class="big">Aku bakal sayang kamu sebanyak:</p>
     <div class="love"><b id="love-num">0</b><span>%</span></div>
-    <figure class="hadiah">
-      <div class="hadiah-frame" id="hadiah-frame">
+    <figure class="hadiah" id="hadiah">
+      <div class="hadiah-frame">
         <img id="hadiah-img" src="iphone.jpeg" alt="iPhone hadiah dari aku">
       </div>
       <figcaption>Aku ada hadiah kecil ya buat kamu, sekalian update hp lamamu biar dapet update software</figcaption>
@@ -184,7 +176,7 @@
 
 <script>
   // ====== UBAH BAGIAN INI ======
-  const NAMA_GEBETAN = "Gek";            // nama / panggilan dia
+  const NAMA_GEBETAN = "Gek";               // nama / panggilan dia
   const NAMA_KAMU    = "Aku";               // namamu
   const NOMOR_WA     = "6285792419931";     // format 62..., tanpa + dan tanpa 0 di depan
   const PESAN = "Aku seneng banget bisa kenal ma gek. So far aku ngenilai gek orang yang baik, suka nolong, dan tentu saja golput. Aku mau ngajak gek untuk jadi pasangan yang bisa tumbuh bareng dan punya visi jelas. Sambil jalan, gek mau kan jadi pacarku?";
@@ -196,27 +188,36 @@
     "Tombol Mau lebih gampang diklik tuh.",
     "Udah gek, nyerah aja 😄"
   ];
+  // Kosongkan kalau web di GitHub Pages (tanpa server).
+  // Isi alamat servermu (tanpa garis miring di akhir) kalau server.js di-host terpisah.
+  const API = "";
   // =============================
 
   const $ = id => document.getElementById(id);
+  const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Kalau foto iPhone gagal dimuat, tampilkan pesan pengganti
-  $("hadiah-img").addEventListener("error", () => $("hadiah-frame").classList.add("error"));
+  // Kalau foto iPhone gagal dimuat, sembunyikan bingkainya
+  $("hadiah-img").addEventListener("error", () => { $("hadiah").style.display = "none"; });
 
-  // Pencatat kejadian: dikirim ke server tanpa mengganggu tampilan
+  // Pencatat kejadian: tidak mengganggu tampilan kalau server tidak ada
   const SESSION = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random();
   function track(type) {
     try {
       const data = JSON.stringify({ session: SESSION, type });
-      if (!(navigator.sendBeacon && navigator.sendBeacon("/api/event", data))) {
-        fetch("/api/event", { method: "POST", body: data, keepalive: true });
-      }
-    } catch (e) { /* abaikan, halaman tetap jalan */ }
+      fetch(API + "/api/event", { method: "POST", body: data, keepalive: true }).catch(() => {});
+    } catch (e) { /* abaikan */ }
   }
   function trackAsync(type) {
-    return fetch("/api/event", { method: "POST", body: JSON.stringify({ session: SESSION, type }), keepalive: true }).catch(() => {});
+    return fetch(API + "/api/event", { method: "POST", body: JSON.stringify({ session: SESSION, type }), keepalive: true }).catch(() => {});
   }
   track("open_page");
+
+  function simpan(v) { try { localStorage.setItem("gebetan_state", v); } catch (e) {} }
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    $(id).classList.add("active");
+  }
 
   function fmtDur(s) {
     if (s == null) return "-";
@@ -228,7 +229,6 @@
     if (n <= 8)  return "Lumayan gigih mengejar tombol itu, tapi hatimu lebih cepat.";
     return "Kamu mengejar tombol itu sampai capek. Untung hatimu menang 😂";
   }
-  const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function playLove() {
     const num = $("love-num"), start = performance.now(), dur = REDUCE ? 1 : 1400;
@@ -241,12 +241,16 @@
 
   async function loadVerdict() {
     try {
-      const d = await (await fetch("/api/kamu?session=" + encodeURIComponent(SESSION))).json();
+      const r = await fetch(API + "/api/kamu?session=" + encodeURIComponent(SESSION));
+      if (!r.ok) return;
+      const d = await r.json();
+      if (typeof d.coba_nggak !== "number") return;
       const mikir = d.waktu_mikir_detik != null ? "Kamu mikir " + fmtDur(d.waktu_mikir_detik) + " dan mencoba " : "Kamu mencoba ";
       $("verdict").textContent = mikir + 'menekan "Nggak" ' + d.coba_nggak + " kali. " + verdict(d.coba_nggak);
     } catch (e) { /* tanpa server, kalimat ini dilewati */ }
   }
 
+  // Slider sayang
   function sayangTeks(v) {
     if (v < 30) return "Masih malu-malu ya 😳";
     if (v < 60) return "Lumayan, bisa naik lagi lho.";
@@ -261,11 +265,17 @@
   }
   sayang.addEventListener("input", updSayang);
   updSayang();
-  // Penjaga: sebelum jawaban terkirim, browser menanyakan dulu kalau dia mau keluar
-  let wajib = false, selesai = false;
-  const simpan = v => { try { localStorage.setItem("gebetan_state", v); } catch (e) {} };
 
+  // Teks awal
+  document.querySelectorAll(".nama").forEach(el => el.textContent = NAMA_GEBETAN);
+  $("isi").textContent = PESAN;
+  $("wa").href = "https://wa.me/" + NOMOR_WA + "?text=" + encodeURIComponent(BALASAN_WA + " - " + NAMA_KAMU);
+
+  // Navigasi
+  $("open").addEventListener("click", () => { track("open_letter"); show("s2"); });
   $("to-form").addEventListener("click", () => show("s4"));
+
+  // Kirim jawaban
   $("kirim").addEventListener("click", async () => {
     const v = +sayang.value;
     const panggilan = $("panggilan").value.trim().slice(0, 30);
@@ -276,28 +286,22 @@
     }
     $("form-error").textContent = "";
     try {
-      await fetch("/api/jawab", { method: "POST", body: JSON.stringify({ session: SESSION, sayang: v, panggilan }), keepalive: true });
+      await fetch(API + "/api/jawab", { method: "POST", body: JSON.stringify({ session: SESSION, sayang: v, panggilan }), keepalive: true });
     } catch (e) { /* tetap lanjut walau server bermasalah */ }
+
     let teks = v >= 100 ? "Sayangmu penuh 100%. Cocok banget sama punyaku!" : "Sayangmu " + v + "%. Tenang, nanti kubantu naikin sampai penuh 😌";
-    if (panggilan) teks += ' Dan mulai sekarang aku resmi dipanggil "' + panggilan + '". Siap!';
+    teks += ' Dan mulai sekarang aku resmi dipanggil "' + panggilan + '". Siap!';
     $("hasil").textContent = teks;
-    $("wa").href = "https://wa.me/" + NOMOR_WA + "?text=" + encodeURIComponent(BALASAN_WA + " Sayangku buat kamu " + v + "%");
-    selesai = true;
+
+    // Jawabannya ikut dikirim lewat WhatsApp, jadi tetap sampai ke kamu walau tanpa server
+    const wa = BALASAN_WA + "\nSayangku buat kamu " + v + "%\nPanggilan buat kamu: " + panggilan;
+    $("wa").href = "https://wa.me/" + NOMOR_WA + "?text=" + encodeURIComponent(wa);
+
     simpan("done");
     show("s5");
   });
 
-  document.querySelectorAll(".nama").forEach(el => el.textContent = NAMA_GEBETAN);
-  $("isi").textContent = PESAN;
-  $("wa").href = `https://wa.me/${NOMOR_WA}?text=${encodeURIComponent(BALASAN_WA + " - " + NAMA_KAMU)}`;
-
-  function show(id) {
-    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-    $(id).classList.add("active");
-  }
-
-  $("open").addEventListener("click", () => { track("open_letter"); show("s2"); });
-
+  // Tombol "Nggak" menghindar, tombol "Mau" makin besar
   let tries = 0, lastDodge = 0;
   const no = $("no"), yes = $("yes");
 
@@ -310,9 +314,9 @@
     track("no_try");
     no.classList.add("run");
     const w = no.offsetWidth, h = no.offsetHeight, m = 12;
-    no.style.left = m + Math.random() * (window.innerWidth - w - 2 * m) + "px";
-    no.style.top  = m + Math.random() * (window.innerHeight - h - 2 * m) + "px";
-    yes.style.transform = `scale(${Math.min(1 + tries * 0.12, 1.8)})`;
+    no.style.left = m + Math.random() * Math.max(0, window.innerWidth - w - 2 * m) + "px";
+    no.style.top  = m + Math.random() * Math.max(0, window.innerHeight - h - 2 * m) + "px";
+    yes.style.transform = "scale(" + Math.min(1 + tries * 0.12, 1.8) + ")";
     $("hint").textContent = KETERANGAN_NO[Math.min(tries - 1, KETERANGAN_NO.length - 1)];
   }
   no.addEventListener("pointerdown", dodge);
@@ -324,8 +328,7 @@
     no.classList.remove("run");
     show("s3");
     playLove();
-    startGuard();
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (REDUCE) return;
     const icons = ["💖", "💗", "💕", "✨", "🌸"];
     for (let i = 0; i < 40; i++) {
       const h = document.createElement("span");
@@ -339,16 +342,15 @@
     }
   });
 
-  // Lanjutkan dari tempat terakhir kalau halaman dibuka lagi. Tambahkan ?reset di alamat untuk mengulang dari awal (saat kamu tes).
+  // Kalau halaman dibuka lagi setelah jawaban terkirim, langsung ke layar akhir.
+  // Tambahkan ?reset di alamat untuk mengulang dari awal (saat kamu tes).
   try {
-  if (location.search.includes("reset")) localStorage.removeItem("gebetan_state");
-  const st = localStorage.getItem("gebetan_state");
-  if (st === "done") {
-    selesai = true;
-    $("hasil").textContent = "Jawaban gek udah terkirim. Thank uuuu, sayang.. 🥰";
-    show("s5");
-  }
-} catch (e) { /* abaikan */ }
+    if (location.search.includes("reset")) localStorage.removeItem("gebetan_state");
+    if (localStorage.getItem("gebetan_state") === "done") {
+      $("hasil").textContent = "Jawaban gek udah terkirim. Thank uuuu, sayang.. 🥰";
+      show("s5");
+    }
+  } catch (e) { /* abaikan */ }
 </script>
 </body>
 </html>
