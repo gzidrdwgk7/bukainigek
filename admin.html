@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pantauan Gebetan</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#2a1b3d; --bg:#e9e1f7; --paper:#fffdf8; --rose:#e8477a; --butter:#ffe9a8; --muted:#6b5c80; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "Nunito", system-ui, sans-serif; color: var(--ink); background: var(--bg);
+         padding: max(16px, env(safe-area-inset-top)) 16px 40px; }
+  main { max-width: 440px; margin: 0 auto; display: grid; gap: 14px; }
+  h1 { font-family: "Caveat", "Comic Sans MS", cursive; font-size: 2.2rem; text-align: center; }
+  .box { background: var(--paper); border-radius: 16px; padding: 18px; box-shadow: 0 2px 0 var(--butter), 0 10px 24px rgba(42,27,61,.12); }
+  .status { text-align: center; }
+  .status .emoji { font-size: 3rem; display: block; }
+  .status strong { font-family: "Caveat", cursive; font-size: 1.8rem; display: block; margin: 4px 0; }
+  .status p, .note { color: var(--muted); line-height: 1.5; font-size: .95rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .num { text-align: center; padding: 12px 6px; border-radius: 12px; background: #f6f1fc; }
+  .num b { font-size: 1.9rem; display: block; }
+  .num span { font-size: .85rem; color: var(--muted); }
+  .meter { height: 14px; background: #eee6f7; border-radius: 99px; overflow: hidden; margin: 10px 0 8px; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--rose); transition: width .6s; }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+  li { display: flex; justify-content: space-between; gap: 10px; font-size: .92rem; }
+  li time { color: var(--muted); white-space: nowrap; }
+  .empty { color: var(--muted); text-align: center; padding: 10px 0; }
+  .foot { text-align: center; font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pantauan Gebetan 🕵️</h1>
+
+  <section class="box status" id="status">
+    <span class="emoji">⏳</span><strong>Memuat...</strong><p></p>
+  </section>
+
+  <section class="box">
+    <div class="grid">
+      <div class="num"><b id="n-link">0</b><span>kali link dibuka</span></div>
+      <div class="num"><b id="n-amplop">0</b><span>kali amplop dibuka</span></div>
+      <div class="num"><b id="n-nggak">0</b><span>coba tekan "Nggak"</span></div>
+      <div class="num"><b id="n-mau">0</b><span>tekan "Mau"</span></div>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2>Meter kegalauan</h2>
+    <div class="meter"><i id="bar"></i></div>
+    <p class="note" id="galau-teks"></p>
+  </section>
+
+  <section class="box">
+    <h2>Statistik receh</h2>
+    <ul>
+      <li><span>⏱️ Waktu mikir</span><b id="mikir">-</b></li>
+      <li><span>🌙 Jam favorit buka link</span><b id="jam">-</b></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2>Jawaban dia 💌</h2>
+    <ul id="jawaban"></ul>
+  </section>
+
+  <section class="box">
+    <h2>Riwayat kejadian</h2>
+    <ul id="riwayat"></ul>
+  </section>
+
+  <p class="foot" id="foot">Diperbarui otomatis tiap 10 detik</p>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const KEY = new URLSearchParams(location.search).get("key") || prompt("Masukkan kata sandi admin:");
+
+  const STATUS = {
+    belum:    ["⏳", "Belum ada kabar",        "Linknya belum dibuka. Sabar, mungkin dia lagi sibuk."],
+    dibuka:   ["👀", "Linknya sudah dibuka",   "Dia sudah mampir, tapi amplopnya belum dibuka. Penasaran, tapi malu?"],
+    membaca:  ["💌", "Sedang membaca pesanmu", "Amplop sudah dibuka. Deg-degan? Wajar."],
+    galau:    ["🤔", "Dia lagi galau",         "Dia sudah mencoba menekan Nggak, tapi tombolnya kabur terus. Semesta berpihak padamu."],
+    diterima: ["🎉", "DITERIMA!",              "Dia menekan Mau! Segera cek WhatsApp, dan jangan lupa tarik napas."]
+  };
+
+  function galauText(n) {
+    if (n === 0) return "Belum ada yang berani menolak 😌";
+    if (n <= 2)  return "Masih ragu-ragu, tapi wajar.";
+    if (n <= 5)  return "Gengsinya lumayan tebal juga.";
+    if (n <= 10) return "Lagi kejar-kejaran sama tombol Nggak 🏃";
+    return "Jarinya pasti pegal, hatinya sudah luluh 😂";
+  }
+
+  const LABEL = {
+    open_page:   "👀 Link dibuka",
+    open_letter: "💌 Amplop dibuka",
+    no_try:      "🏃 Mencoba tekan Nggak (kabur!)",
+    yes:         "💖 Menekan Mau!!!"
+  };
+
+  const fmtTime = iso => new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  function fmtDur(s) {
+    if (s == null) return "-";
+    if (s < 60) return s + " detik";
+    return Math.floor(s / 60) + " menit " + (s % 60) + " detik";
+  }
+
+  async function load() {
+    try {
+      const res = await fetch("/api/stats?key=" + encodeURIComponent(KEY));
+      if (res.status === 401) { $("status").innerHTML = '<span class="emoji">🔒</span><strong>Kata sandi salah</strong><p>Muat ulang halaman lalu coba lagi.</p>'; return; }
+      const d = await res.json();
+
+      const [emoji, judul, teks] = STATUS[d.status] || STATUS.belum;
+      $("status").innerHTML = `<span class="emoji">${emoji}</span><strong>${judul}</strong><p>${teks}</p>`;
+
+      $("n-link").textContent = d.buka_link;
+      $("n-amplop").textContent = d.buka_amplop;
+      $("n-nggak").textContent = d.coba_nggak;
+      $("n-mau").textContent = d.tekan_mau;
+
+      $("bar").style.width = Math.min(100, d.coba_nggak * 10) + "%";
+      $("galau-teks").textContent = galauText(d.coba_nggak);
+
+      $("mikir").textContent = fmtDur(d.waktu_mikir_detik);
+
+      const perJam = {};
+      d.waktu_buka.forEach(t => { const h = new Date(t).getHours(); perJam[h] = (perJam[h] || 0) + 1; });
+      const top = Object.entries(perJam).sort((a, b) => b[1] - a[1])[0];
+      $("jam").textContent = top ? String(top[0]).padStart(2, "0") + ".00" : "-";
+
+      const jw = $("jawaban");
+      jw.innerHTML = "";
+      const daftar = d.jawaban || [];
+      if (!daftar.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Belum ada jawaban."; jw.appendChild(li); }
+      daftar.forEach(x => {
+        const li = document.createElement("li");
+        const t = document.createElement("span");
+        t.textContent = "Sayang " + x.sayang + "%" + (x.panggilan ? ' · "' + x.panggilan + '"' : "") + (x.kencan ? " · " + x.kencan : "");
+        const w = document.createElement("time"); w.textContent = fmtTime(x.at);
+        li.append(t, w); jw.appendChild(li);
+      });
+
+      const ul = $("riwayat");
+      ul.innerHTML = "";
+      if (!d.riwayat.length) { ul.innerHTML = '<li class="empty">Belum ada kejadian.</li>'; }
+      d.riwayat.forEach(e => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${LABEL[e.type] || e.type}</span><time>${fmtTime(e.at)}</time>`;
+        ul.appendChild(li);
+      });
+    } catch (err) {
+      $("foot").textContent = "Gagal memuat data. Pastikan server masih jalan.";
+    }
+  }
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>
