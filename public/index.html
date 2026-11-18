@@ -289,8 +289,8 @@
       await fetch(API + "/api/jawab", { method: "POST", body: JSON.stringify({ session: SESSION, sayang: v, panggilan }), keepalive: true });
     } catch (e) { /* tetap lanjut walau server bermasalah */ }
 
-    let teks = v >= 100 ? "Sayangmu penuh 100%. Cocok banget sama punyaku!" : "Sayangmu " + v + "%. Tenang, nanti kubantu naikin sampai penuh 😌";
-    teks += ' Dan mulai sekarang aku resmi dipanggil "' + panggilan + '". Siap!';
+    let teks = v >= 100 ? "Sayangmu penuh 100%. Jodoh banget sih ni.." : "Sayangmu " + v + "%. Yahhh, yaudah sambil jalan yaa 😌";
+    teks += ' Anjay, sekarang aku resmi dipanggil "' + panggilan + '". Gas!';
     $("hasil").textContent = teks;
 
     // Jawabannya ikut dikirim lewat WhatsApp, jadi tetap sampai ke kamu walau tanpa server
